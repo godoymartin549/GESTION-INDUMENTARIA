@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Indumentaria - Módulo Completo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    
+    /* REGLAS ESTRICTAS PARA IMPRESIÓN A4 */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      .no-print, header, nav, button, .tab-btn {
+        display: none !important;
+      }
+      .solapa-contenido {
+        display: block !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      .container-print {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      /* Cuando se imprime la factura se oculta el resto */
+      body.printing-factura .solapa-contenido,
+      body.printing-factura #print-header-compras {
+        display: none !important;
+      }
+      body.printing-factura #print-header-factura {
+        display: block !important;
+      }
+      /* Cuando se imprime stock compras se oculta la factura */
+      body.printing-compras .solapa-contenido,
+      body.printing-compras #print-header-factura {
+        display: none !important;
+      }
+      body.printing-compras #print-header-compras {
+        display: block !important;
+      }
+      table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+      }
+      th, td {
+        border: 1px solid #cbd5e1 !important;
+        padding: 6px 8px !important;
+        font-size: 11px !important;
+      }
+      th {
+        background-color: #f1f5f9 !important;
+      }
+    }
+    .print-only { display: none; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen pb-12">
+
+  <!-- HEADER NAVEGACIÓN -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 no-print shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="bg-sky-600 text-white p-2.5 rounded-xl shadow-sm">
+          <i class="fa-solid fa-shirt text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-slate-900 leading-tight">Gestión de Indumentaria</h1>
+          <p class="text-xs text-slate-500 font-medium">Sistema de Stock, Ventas, Cuentas Corrientes y Ganancias</p>
+        </div>
+      </div>
+
+      <nav class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
+        <button onclick="cambiarSolapa('inventario')" id="tab-btn-inventario" class="tab-btn px-4 py-2 rounded-lg transition-all text-sky-700 bg-white shadow-xs">
+          <i class="fa-solid fa-boxes-stacked mr-1.5"></i> Inventario
+        </button>
+        <button onclick="cambiarSolapa('facturacion')" id="tab-btn-facturacion" class="tab-btn px-4 py-2 rounded-lg transition-all text-slate-600 hover:text-slate-900">
+          <i class="fa-solid fa-file-invoice-dollar mr-1.5"></i> Facturación
+        </button>
+        <button onclick="cambiarSolapa('cc')" id="tab-btn-cc" class="tab-btn px-4 py-2 rounded-lg transition-all text-slate-600 hover:text-slate-900">
+          <i class="fa-solid fa-address-book mr-1.5"></i> Cuentas Corrientes
+        </button>
+        <button onclick="cambiarSolapa('resumen')" id="tab-btn-resumen" class="tab-btn px-4 py-2 rounded-lg transition-all text-slate-600 hover:text-slate-900">
+          <i class="fa-solid fa-chart-line mr-1.5"></i> Ganancias Semanales
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- VISTA EXCLUSIVA IMPRESIÓN STOCK COMPRAS -->
+  <div id="print-header-compras" class="print-only p-6 border-b border-slate-300 mb-4">
+    <div class="flex justify-between items-center mb-4">
+      <div>
+        <h1 class="text-xl font-bold uppercase tracking-wide">REPORTE DE STOCK Y REPOSICIÓN DE COMPRAS</h1>
+        <p class="text-xs text-slate-600">Listado exclusivo de costo directo de adquisición (Sin precios de venta)</p>
+      </div>
+      <div class="text-right text-xs text-slate-500">
+        <p id="fecha-impresion-compras"></p>
+      </div>
+    </div>
+    <table class="w-full text-left text-xs border-collapse">
+      <thead>
+        <tr class="bg-slate-100 uppercase text-[10px] font-bold">
+          <th class="p-2 border">Código</th>
+          <th class="p-2 border">Producto</th>
+          <th class="p-2 border">Categoría</th>
+          <th class="p-2 border">Talle / Color</th>
+          <th class="p-2 border text-center">Stock</th>
+          <th class="p-2 border text-right">Costo Unit.</th>
+          <th class="p-2 border text-right">Costo Total</th>
+        </tr>
+      </thead>
+      <tbody id="print-compras-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- VISTA EXCLUSIVA IMPRESIÓN FACTURA / COMPROBANTE A4 -->
+  <div id="print-header-factura" class="print-only p-8 mb-4 border border-slate-300 rounded-lg">
+    <div class="flex justify-between items-start border-b border-slate-300 pb-6 mb-6">
+      <div>
+        <h1 class="text-2xl font-bold uppercase tracking-wider text-slate-900">COMPROBANTE DE VENTA</h1>
+        <p class="text-sm font-semibold text-slate-600">LOCAL DE INDUMENTARIA</p>
+        <p class="text-xs text-slate-500">Documento no válido como factura fiscal</p>
+      </div>
+      <div class="text-right">
+        <div class="inline-block bg-slate-100 border border-slate-300 px-3 py-1 rounded text-sm font-bold text-slate-800 mb-1" id="print-factura-nro">N° VTA-000</div>
+        <p class="text-xs text-slate-600">Fecha: <span id="print-factura-fecha"></span></p>
+        <p class="text-xs font-bold text-slate-700 uppercase">Condición: <span id="print-factura-condicion"></span></p>
+      </div>
+    </div>
+
+    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 text-xs grid grid-cols-3 gap-4">
+      <div>
+        <span class="text-slate-400 font-semibold block uppercase text-[10px]">Cliente / Razón Social</span>
+        <strong class="text-sm text-slate-800" id="print-factura-cliente">--</strong>
+      </div>
+      <div>
+        <span class="text-slate-400 font-semibold block uppercase text-[10px]">Teléfono</span>
+        <strong class="text-slate-800" id="print-factura-tel">--</strong>
+      </div>
+      <div>
+        <span class="text-slate-400 font-semibold block uppercase text-[10px]">DNI / CUIT</span>
+        <strong class="text-slate-800" id="print-factura-cuit">--</strong>
+      </div>
+    </div>
+
+    <table class="w-full text-left text-xs mb-6">
+      <thead>
+        <tr class="bg-slate-100 uppercase text-[10px] font-bold text-slate-700 border-y border-slate-300">
+          <th class="p-2">Producto</th>
+          <th class="p-2">Talle</th>
+          <th class="p-2">Color</th>
+          <th class="p-2 text-center">Cant.</th>
+          <th class="p-2 text-right">P. Unitario</th>
+          <th class="p-2 text-right">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody id="print-factura-body"></tbody>
+      <tfoot>
+        <tr class="border-t-2 border-slate-300 font-bold text-sm">
+          <td colspan="5" class="p-3 text-right">TOTAL COMPROBANTE:</td>
+          <td class="p-3 text-right text-slate-900" id="print-factura-total">$0,00</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="mt-16 pt-8 border-t border-slate-300 flex justify-between items-end text-xs text-slate-500">
+      <div class="text-center w-48 border-t border-slate-400 pt-1">
+        Firma / Conformidad Cliente
+      </div>
+      <div class="text-right">
+        ¡Muchas gracias por su compra!
+      </div>
+    </div>
+  </div>
+
+  <main class="container-print max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+
+    <!-- SOLAPA 1: INVENTARIO -->
+    <div id="solapa-inventario" class="solapa-contenido">
+      <div class="flex flex-wrap justify-end items-center gap-2 mb-6 no-print">
+        <button onclick="imprimirStockCompras()" class="bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 font-semibold px-3.5 py-2 rounded-xl text-xs transition-all flex items-center gap-2">
+          <i class="fa-solid fa-print"></i> Imprimir Stock de Compras
+        </button>
+        <button onclick="exportarStockComprasCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-all shadow-sm flex items-center gap-2">
+          <i class="fa-solid fa-cart-shopping"></i> Exportar Stock Compras (Excel)
+        </button>
+        <button onclick="exportarCompletoCSV()" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-all shadow-sm flex items-center gap-2">
+          <i class="fa-solid fa-file-excel text-emerald-400"></i> Exportar Completo (Excel)
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 no-print">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">TOTAL PRODUCTOS</span>
+            <span class="bg-sky-50 text-sky-600 p-2 rounded-lg text-sm"><i class="fa-solid fa-boxes-stacked"></i></span>
+          </div>
+          <div class="mt-2 text-2xl font-bold text-slate-900" id="metric-total-prod">0</div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">VALOR INVENTARIO</span>
+            <span class="bg-emerald-50 text-emerald-600 p-2 rounded-lg text-sm"><i class="fa-solid fa-wallet"></i></span>
+          </div>
+          <div class="mt-2 text-2xl font-bold text-slate-900" id="metric-valor-inv">$0</div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">PROM. MAYORISTA</span>
+            <span class="bg-amber-50 text-amber-600 p-2 rounded-lg text-sm"><i class="fa-solid fa-store"></i></span>
+          </div>
+          <div class="mt-2 text-2xl font-bold text-slate-900" id="metric-prom-may">$0</div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">PROM. MINORISTA</span>
+            <span class="bg-indigo-50 text-indigo-600 p-2 rounded-lg text-sm"><i class="fa-solid fa-tag"></i></span>
+          </div>
+          <div class="mt-2 text-2xl font-bold text-slate-900" id="metric-prom-min">$0</div>
+        </div>
+      </div>
+
+      <!-- FORMULARIO DE PRODUCTO -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 mb-8 no-print" id="form-container">
+        <div class="flex justify-between items-center mb-6">
+          <div class="flex items-center space-x-3">
+            <span class="bg-slate-100 text-slate-700 p-2 rounded-lg"><i class="fa-solid fa-box-archive"></i></span>
+            <h2 class="text-lg font-bold text-slate-900" id="form-title">Ingresar Nuevo Producto</h2>
+          </div>
+          <span class="text-xs bg-slate-100 text-slate-600 font-semibold px-3 py-1 rounded-full border border-slate-200" id="next-id-badge">Próximo ID: ART-101</span>
+        </div>
+
+        <form id="product-form" onsubmit="guardarProducto(event)" class="space-y-4">
+          <input type="hidden" id="edit-id-input" value="">
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre / Descripción *</label>
+              <input type="text" id="nombre" required placeholder="Ej: Bóxer Algodón con Lycra" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Categoría *</label>
+              <select id="categoria" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <option value="Ropa Interior Masculina">Ropa Interior Masculina</option>
+                <option value="Ropa Interior Femenina">Ropa Interior Femenina</option>
+                <option value="Remeras y Tops">Remeras y Tops</option>
+                <option value="Pantalones y Shorts">Pantalones y Shorts</option>
+                <option value="Accesorios">Accesorios</option>
+                <option value="Otra">Otra</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Sexo *</label>
+              <select id="sexo" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <option value="Masculino">Masculino</option>
+                <option value="Femenino">Femenino</option>
+                <option value="Unisex">Unisex</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Talle *</label>
+              <select id="talle" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <optgroup label="General / Letras">
+                  <option value="Talle Único">Talle Único</option>
+                  <option value="XS">XS</option>
+                  <option value="S">S</option>
+                  <option value="M">M</option>
+                  <option value="L">L</option>
+                  <option value="XL">XL</option>
+                  <option value="XXL">XXL</option>
+                  <option value="XXXL">XXXL</option>
+                </optgroup>
+                <optgroup label="Talles Numéricos (1 al 10)">
+                  <option value="Talle 1">1</option>
+                  <option value="Talle 2">2</option>
+                  <option value="Talle 3">3</option>
+                  <option value="Talle 4">4</option>
+                  <option value="Talle 5">5</option>
+                  <option value="Talle 6">6</option>
+                  <option value="Talle 7">7</option>
+                  <option value="Talle 8">8</option>
+                  <option value="Talle 9">9</option>
+                  <option value="Talle 10">10</option>
+                </optgroup>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Color *</label>
+              <input type="text" id="color" required placeholder="Ej: Gris Melange" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Cantidad (Stock) *</label>
+              <input type="number" id="cantidad" required min="1" placeholder="Ej: 10" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Costo Unitario Directo ($) *</label>
+              <input type="number" id="costo" required step="0.01" min="0" placeholder="Ej: 4500" oninput="calcularPrecios()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">% Margen May. *</label>
+                <select id="margen-may" onchange="calcularPrecios()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <option value="30">30%</option>
+                  <option value="40" selected>40%</option>
+                  <option value="50">50%</option>
+                  <option value="60">60%</option>
+                  <option value="70">70%</option>
+                  <option value="80">80%</option>
+                  <option value="100">100%</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">% Margen Min. *</label>
+                <select id="margen-min" onchange="calcularPrecios()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+                  <option value="60">60%</option>
+                  <option value="80">80%</option>
+                  <option value="100" selected>100%</option>
+                  <option value="120">120%</option>
+                  <option value="150">150%</option>
+                  <option value="200">200%</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200">
+              <div>
+                <span class="text-xs text-slate-500 font-medium block">Precio Mayorista Calculado</span>
+                <span class="text-lg font-bold text-amber-600" id="preview-precio-may">$0,00</span>
+              </div>
+              <span class="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-md font-semibold" id="preview-ganancia-may">+$0,00</span>
+            </div>
+            <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200">
+              <div>
+                <span class="text-xs text-slate-500 font-medium block">Precio Minorista Calculado</span>
+                <span class="text-lg font-bold text-indigo-600" id="preview-precio-min">$0,00</span>
+              </div>
+              <span class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md font-semibold" id="preview-ganancia-min">+$0,00</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 pt-2">
+            <button type="submit" id="btn-submit" class="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 rounded-xl transition-all shadow-sm text-sm flex items-center justify-center gap-2">
+              <i class="fa-solid fa-plus"></i> Guardar Producto
+            </button>
+            <button type="button" id="btn-cancel" onclick="cancelarEdicion()" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-5 py-3 rounded-xl text-sm transition-all">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- TABLA INVENTARIO -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-slate-100 flex flex-wrap justify-between items-center gap-4 no-print">
+          <h3 class="text-base font-bold text-slate-900">Listado de Inventario</h3>
+          <div class="relative w-full sm:w-64">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+            <input type="text" id="search" oninput="renderizarTabla()" placeholder="Buscar código, producto..." class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider font-semibold text-slate-500">
+                <th class="p-3.5 pl-5">Código</th>
+                <th class="p-3.5">Producto</th>
+                <th class="p-3.5">Talle / Color</th>
+                <th class="p-3.5 text-center">Stock</th>
+                <th class="p-3.5 text-right">Costo Directo</th>
+                <th class="p-3.5 text-right text-emerald-700">Total Compra</th>
+                <th class="p-3.5 text-right text-amber-700">P. Mayorista</th>
+                <th class="p-3.5 text-right text-indigo-700">P. Minorista</th>
+                <th class="p-3.5 text-center no-print">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-body" class="divide-y divide-slate-100 text-xs text-slate-700"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SOLAPA 2: FACTURACIÓN -->
+    <div id="solapa-facturacion" class="solapa-contenido hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-6">
+          <h2 class="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">Emitir Comprobante de Venta</h2>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre / Razón Social *</label>
+              <input type="text" id="vta-cliente-nombre" oninput="buscarAutocompleteCliente()" placeholder="Ej: Juan Pérez" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Teléfono</label>
+              <input type="text" id="vta-cliente-tel" placeholder="Ej: 11-2345-6789" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">DNI / CUIT</label>
+              <input type="text" id="vta-cliente-cuit" placeholder="Ej: 20-30405060-9" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm">
+            </div>
+          </div>
+
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Agregar Producto al Carrito</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Producto disponible</label>
+                <select id="vta-select-producto" onchange="actualizarPrecioVentaUnitario()" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs"></select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Tipo de Precio</label>
+                <select id="vta-tipo-precio" onchange="actualizarPrecioVentaUnitario()" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-indigo-700">
+                  <option value="minorista">Minorista</option>
+                  <option value="mayorista">Mayorista</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Cantidad</label>
+                <input type="number" id="vta-cantidad" min="1" value="1" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold">
+              </div>
+            </div>
+            <div class="flex justify-between items-center pt-2">
+              <span class="text-xs text-slate-500">Precio Unitario: <strong id="vta-precio-unitario" class="text-slate-800">$0,00</strong></span>
+              <button onclick="agregarAlCarrito()" class="bg-sky-600 hover:bg-sky-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow-xs">
+                + Agregar ítem
+              </button>
+            </div>
+          </div>
+
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 uppercase text-[10px] font-semibold">
+                <tr>
+                  <th class="p-3">Producto</th>
+                  <th class="p-3 text-center">Cant.</th>
+                  <th class="p-3 text-right">P. Unit</th>
+                  <th class="p-3 text-right">Subtotal</th>
+                  <th class="p-3 text-center">Quitar</th>
+                </tr>
+              </thead>
+              <tbody id="carrito-body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+          <div class="space-y-4">
+            <h2 class="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">Resumen del Pedido</h2>
+            
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between text-slate-600">
+                <span>Total Ítems:</span>
+                <strong id="vta-total-items" class="text-slate-800">0</strong>
+              </div>
+              <div class="flex justify-between text-base font-bold text-slate-900 pt-2 border-t border-slate-100">
+                <span>Total a Cobrar:</span>
+                <span id="vta-total-monto" class="text-emerald-600 text-xl">$0,00</span>
+              </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-100 space-y-3">
+              <label class="block text-xs font-semibold text-slate-600">Condición de Pago *</label>
+              <div class="grid grid-cols-2 gap-3">
+                <label class="border border-slate-200 p-3 rounded-xl flex items-center gap-2 cursor-pointer hover:bg-slate-50">
+                  <input type="radio" name="condicion-pago" value="contado" checked class="text-sky-600">
+                  <span class="text-xs font-bold text-slate-700">Contado</span>
+                </label>
+                <label class="border border-slate-200 p-3 rounded-xl flex items-center gap-2 cursor-pointer hover:bg-slate-50">
+                  <input type="radio" name="condicion-pago" value="cc" class="text-sky-600">
+                  <span class="text-xs font-bold text-slate-700">Cuenta Corriente</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 space-y-2">
+            <button onclick="procesarVenta(true)" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3.5 rounded-xl shadow-sm text-sm transition-all flex items-center justify-center gap-2">
+              <i class="fa-solid fa-print"></i> Confirmar e Imprimir Factura A4
+            </button>
+            <button onclick="procesarVenta(false)" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-2">
+              <i class="fa-solid fa-check"></i> Solo Registrar (Sin imprimir)
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- VISTA PREVIA EN PANTALLA -->
+      <div id="vista-previa-factura-container" class="mt-8 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hidden">
+        <div class="flex justify-between items-center mb-4 no-print border-b border-slate-100 pb-3">
+          <h3 class="text-base font-bold text-slate-900"><i class="fa-solid fa-file-invoice text-sky-600 mr-2"></i> Vista Previa de Comprobante / Factura</h3>
+          <button onclick="imprimirVistaPreviaA4()" class="bg-sky-600 hover:bg-sky-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-sm flex items-center gap-2">
+            <i class="fa-solid fa-print"></i> Imprimir Comprobante (A4)
+          </button>
+        </div>
+        
+        <div class="border border-slate-200 p-6 rounded-xl bg-slate-50">
+          <div class="flex justify-between items-start border-b border-slate-300 pb-4 mb-4">
+            <div>
+              <h2 class="text-xl font-bold text-slate-900 uppercase">COMPROBANTE DE VENTA</h2>
+              <p class="text-xs text-slate-500 font-semibold">LOCAL DE INDUMENTARIA</p>
+            </div>
+            <div class="text-right">
+              <span class="bg-slate-200 text-slate-800 text-xs px-2.5 py-1 rounded font-bold" id="pv-nro">N° VTA-000</span>
+              <p class="text-xs text-slate-500 mt-1">Fecha: <span id="pv-fecha"></span></p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4 text-xs mb-4 bg-white p-3 rounded-lg border border-slate-200">
+            <div><span class="text-slate-400 block text-[10px] uppercase font-bold">Cliente</span> <strong id="pv-cliente" class="text-slate-800">--</strong></div>
+            <div><span class="text-slate-400 block text-[10px] uppercase font-bold">Teléfono</span> <strong id="pv-tel" class="text-slate-800">--</strong></div>
+            <div><span class="text-slate-400 block text-[10px] uppercase font-bold">DNI/CUIT</span> <strong id="pv-cuit" class="text-slate-800">--</strong></div>
+          </div>
+
+          <table class="w-full text-left text-xs mb-4 border border-slate-200 rounded-lg overflow-hidden bg-white">
+            <thead class="bg-slate-100 text-slate-700 font-bold uppercase text-[10px]">
+              <tr>
+                <th class="p-2">Producto</th>
+                <th class="p-2">Talle</th>
+                <th class="p-2">Color</th>
+                <th class="p-2 text-center">Cant.</th>
+                <th class="p-2 text-right">P. Unit</th>
+                <th class="p-2 text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody id="pv-body" class="divide-y divide-slate-100"></tbody>
+            <tfoot>
+              <tr class="font-bold border-t border-slate-200">
+                <td colspan="5" class="p-2.5 text-right">TOTAL:</td>
+                <td class="p-2.5 text-right text-emerald-600 text-sm" id="pv-total">$0,00</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="flex justify-between items-center no-print pt-2">
+            <span class="text-xs text-slate-400">¿Desea enviar este comprobante a la impresora?</span>
+            <button onclick="imprimirVistaPreviaA4()" class="bg-sky-600 hover:bg-sky-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-sm flex items-center gap-2">
+              <i class="fa-solid fa-print"></i> Imprimir Comprobante (A4)
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SOLAPA 3: CUENTAS CORRIENTES -->
+    <div id="solapa-cc" class="solapa-contenido hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+          <h2 class="text-base font-bold text-slate-900">Clientes en Cuenta Corriente</h2>
+          <div class="relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+            <input type="text" id="search-cc-cliente" oninput="renderizarListaClientesCC()" placeholder="Buscar cliente..." class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs">
+          </div>
+          <div id="lista-clientes-cc" class="divide-y divide-slate-100 max-h-96 overflow-y-auto"></div>
+        </div>
+
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-6">
+          <div class="flex justify-between items-start border-b border-slate-100 pb-4">
+            <div>
+              <h2 class="text-lg font-bold text-slate-900" id="cc-nombre-cliente">Seleccione un cliente</h2>
+              <p class="text-xs text-slate-500" id="cc-datos-cliente">Teléfono / CUIT</p>
+            </div>
+            <div class="text-right">
+              <span class="text-xs text-slate-400 uppercase font-semibold block">Saldo Pendiente</span>
+              <span class="text-2xl font-bold text-rose-600" id="cc-saldo-cliente">$0,00</span>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Registrar Pago / Entrega de Dinero</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Monto Entregado ($)</label>
+                <input type="number" id="cc-monto-pago" step="0.01" min="0" placeholder="Ej: 5000" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-emerald-700">
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-semibold text-slate-500 mb-1">Concepto / Comprobante</label>
+                <input type="text" id="cc-concepto-pago" placeholder="Ej: Entrega a cuenta o Transferencia" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs">
+              </div>
+            </div>
+            <button onclick="registrarPagoCC()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow-xs">
+              + Registrar Cobro
+            </button>
+          </div>
+
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 uppercase text-[10px] font-semibold">
+                <tr>
+                  <th class="p-3">Fecha</th>
+                  <th class="p-3">Concepto</th>
+                  <th class="p-3 text-right text-rose-700">Debe</th>
+                  <th class="p-3 text-right text-emerald-700">Haber</th>
+                  <th class="p-3 text-right font-bold">Saldo</th>
+                </tr>
+              </thead>
+              <tbody id="cc-tabla-body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SOLAPA 4: GANANCIAS SEMANALES -->
+    <div id="solapa-resumen" class="solapa-contenido hidden">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Ventas Registradas</span>
+          <div class="mt-2 text-2xl font-bold text-slate-900" id="resumen-total-ventas">$0,00</div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Costo Directo de Compra</span>
+          <div class="mt-2 text-2xl font-bold text-slate-600" id="resumen-total-costo">$0,00</div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Ganancia Real Neta</span>
+          <div class="mt-2 text-2xl font-bold text-emerald-600" id="resumen-total-ganancia">$0,00</div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-slate-100">
+          <h3 class="text-base font-bold text-slate-900">Historial de Operaciones y Reimpresión A4</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider font-semibold text-slate-500">
+                <th class="p-3.5 pl-5">N° Venta / Fecha</th>
+                <th class="p-3.5">Cliente</th>
+                <th class="p-3.5">Condición</th>
+                <th class="p-3.5 text-right">Total Venta</th>
+                <th class="p-3.5 text-right text-slate-500">Costo Acum.</th>
+                <th class="p-3.5 text-right text-emerald-700 font-bold">Ganancia Neta</th>
+                <th class="p-3.5 text-center">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="resumen-tabla-body" class="divide-y divide-slate-100 text-slate-700"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // ESTADO CON PERSISTENCIA
+    let productos = JSON.parse(localStorage.getItem('productos_indumentaria_m1_v6')) || [
+      { id: 'ART-101', nombre: 'BÓXER UOMO', categoria: 'Ropa Interior Masculina', sexo: 'Masculino', talle: 'Talle Único', color: 'VARIOS', cantidad: 10, costo: 20000, margenMay: 100, margenMin: 80 },
+      { id: 'ART-102', nombre: 'BÓXER DUFOUR', categoria: 'Ropa Interior Masculina', sexo: 'Masculino', talle: 'XXXL', color: 'VARIOS', cantidad: 12, costo: 6200, margenMay: 40, margenMin: 80 },
+      { id: 'ART-103', nombre: 'JUEGO DE TOALLÓN Y TOALLA', categoria: 'Otra', sexo: 'Unisex', talle: 'Talle Único', color: 'VERDE', cantidad: 6, costo: 7800, margenMay: 40, margenMin: 80 }
+    ];
+
+    let ventas = JSON.parse(localStorage.getItem('ventas_indumentaria_m1_v6')) || [];
+    let clientesCC = JSON.parse(localStorage.getItem('clientes_cc_indumentaria_m1_v6')) || {};
+    let carritoVenta = [];
+    let clienteCCSeleccionado = null;
+    let ultimaVentaProcesada = null;
+
+    function guardarEstadoGlobal() {
+      localStorage.setItem('productos_indumentaria_m1_v6', JSON.stringify(productos));
+      localStorage.setItem('ventas_indumentaria_m1_v6', JSON.stringify(ventas));
+      localStorage.setItem('clientes_cc_indumentaria_m1_v6', JSON.stringify(clientesCC));
+    }
+
+    // CONTROL DE SOLAPAS
+    function cambiarSolapa(solapa) {
+      document.querySelectorAll('.solapa-contenido').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(el => {
+        el.classList.remove('text-sky-700', 'bg-white', 'shadow-xs');
+        el.classList.add('text-slate-600');
+      });
+
+      document.getElementById('solapa-' + solapa).classList.remove('hidden');
+      const btn = document.getElementById('tab-btn-' + solapa);
+      btn.classList.add('text-sky-700', 'bg-white', 'shadow-xs');
+      btn.classList.remove('text-slate-600');
+
+      if (solapa === 'facturacion') prepararModuloFacturacion();
+      if (solapa === 'cc') renderizarListaClientesCC();
+      if (solapa === 'resumen') renderizarResumenSemanales();
+    }
+
+    // INVENTARIO LÓGICA
+    function calcularPrecios() {
+      const costo = parseFloat(document.getElementById('costo').value) || 0;
+      const mMay = parseFloat(document.getElementById('margen-may').value) || 0;
+      const mMin = parseFloat(document.getElementById('margen-min').value) || 0;
+
+      const pMay = costo * (1 + mMay / 100);
+      const pMin = costo * (1 + mMin / 100);
+
+      document.getElementById('preview-precio-may').textContent = '$' + pMay.toLocaleString('es-AR', {minimumFractionDigits: 2});
+      document.getElementById('preview-precio-min').textContent = '$' + pMin.toLocaleString('es-AR', {minimumFractionDigits: 2});
+      document.getElementById('preview-ganancia-may').textContent = '+$' + (pMay - costo).toLocaleString('es-AR', {minimumFractionDigits: 2});
+      document.getElementById('preview-ganancia-min').textContent = '+$' + (pMin - costo).toLocaleString('es-AR', {minimumFractionDigits: 2});
+    }
+
+    function guardarProducto(e) {
+      e.preventDefault();
+      const editId = document.getElementById('edit-id-input').value;
+
+      const prodData = {
+        id: editId ? editId : 'ART-' + (101 + productos.length),
+        nombre: document.getElementById('nombre').value.trim().toUpperCase(),
+        categoria: document.getElementById('categoria').value,
+        sexo: document.getElementById('sexo').value,
+        talle: document.getElementById('talle').value,
+        color: document.getElementById('color').value.trim().toUpperCase(),
+        cantidad: parseInt(document.getElementById('cantidad').value) || 0,
+        costo: parseFloat(document.getElementById('costo').value) || 0,
+        margenMay: parseFloat(document.getElementById('margen-may').value) || 0,
+        margenMin: parseFloat(document.getElementById('margen-min').value) || 0
+      };
+
+      if (editId) {
+        const index = productos.findIndex(p => p.id === editId);
+        if (index !== -1) productos[index] = prodData;
+      } else {
+        productos.push(prodData);
+      }
+
+      guardarEstadoGlobal();
+      cancelarEdicion();
+      renderizarTabla();
+      actualizarMetricas();
+    }
+
+    function editarProducto(id) {
+      const p = productos.find(item => item.id === id);
+      if (!p) return;
+
+      document.getElementById('edit-id-input').value = p.id;
+      document.getElementById('nombre').value = p.nombre;
+      document.getElementById('categoria').value = p.categoria;
+      document.getElementById('sexo').value = p.sexo;
+      document.getElementById('talle').value = p.talle;
+      document.getElementById('color').value = p.color;
+      document.getElementById('cantidad').value = p.cantidad;
+      document.getElementById('costo').value = p.costo;
+      document.getElementById('margen-may').value = p.margenMay;
+      document.getElementById('margen-min').value = p.margenMin;
+
+      document.getElementById('form-title').textContent = 'Editar Producto (' + p.id + ')';
+      document.getElementById('btn-submit').className = 'flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-xl transition-all shadow-sm text-sm flex items-center justify-center gap-2';
+      document.getElementById('btn-submit').innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Guardar Cambios';
+      document.getElementById('btn-cancel').classList.remove('hidden');
+
+      calcularPrecios();
+      window.scrollTo({ top: document.getElementById('form-container').offsetTop - 20, behavior: 'smooth' });
+    }
+
+    function cancelarEdicion() {
+      document.getElementById('edit-id-input').value = '';
+      document.getElementById('product-form').reset();
+      document.getElementById('form-title').textContent = 'Ingresar Nuevo Producto';
+      document.getElementById('btn-submit').className = 'flex-1 bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 rounded-xl transition-all shadow-sm text-sm flex items-center justify-center gap-2';
+      document.getElementById('btn-submit').innerHTML = '<i class="fa-solid fa-plus"></i> Guardar Producto';
+      document.getElementById('btn-cancel').classList.add('hidden');
+      calcularPrecios();
+    }
+
+    function eliminarProducto(id) {
+      if (confirm('¿Desea eliminar el producto ' + id + ' del inventario?')) {
+        productos = productos.filter(p => p.id !== id);
+        guardarEstadoGlobal();
+        renderizarTabla();
+        actualizarMetricas();
+      }
+    }
+
+    function renderizarTabla() {
+      const query = document.getElementById('search').value.toLowerCase();
+      const tbody = document.getElementById('tabla-body');
+      tbody.innerHTML = '';
+
+      productos.forEach((p) => {
+        if (p.nombre.toLowerCase().includes(query) || p.talle.toLowerCase().includes(query) || p.color.toLowerCase().includes(query) || p.id.toLowerCase().includes(query)) {
+          const pMay = p.costo * (1 + p.margenMay / 100);
+          const pMin = p.costo * (1 + p.margenMin / 100);
+          const costoTotal = p.costo * p.cantidad;
+
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-50 transition-colors';
+          tr.innerHTML = `
+            <td class="p-3.5 pl-5 font-semibold text-slate-500">${p.id}</td>
+            <td class="p-3.5">
+              <div class="font-bold text-slate-900">${p.nombre}</div>
+              <div class="text-[10px] text-slate-400 font-medium">${p.categoria}</div>
+            </td>
+            <td class="p-3.5">
+              <span class="inline-block bg-slate-100 text-slate-800 text-[10px] px-2 py-0.5 rounded font-semibold border border-slate-200">${p.talle}</span>
+              <span class="text-slate-500 ml-1 text-[11px]">${p.color}</span>
+            </td>
+            <td class="p-3.5 text-center font-bold text-slate-800">${p.cantidad}</td>
+            <td class="p-3.5 text-right font-medium">$${p.costo.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+            <td class="p-3.5 text-right font-bold text-emerald-700">$${costoTotal.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+            <td class="p-3.5 text-right font-semibold text-amber-700">$${pMay.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+            <td class="p-3.5 text-right font-bold text-indigo-700">$${pMin.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+            <td class="p-3.5 text-center no-print">
+              <button onclick="editarProducto('${p.id}')" class="text-sky-600 hover:text-sky-800 p-1.5 mr-1" title="Editar"><i class="fa-solid fa-pen"></i></button>
+              <button onclick="eliminarProducto('${p.id}')" class="text-rose-500 hover:text-rose-700 p-1.5" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        }
+      });
+    }
+
+    function actualizarMetricas() {
+      const totalProd = productos.reduce((acc, p) => acc + p.cantidad, 0);
+      const valorInv = productos.reduce((acc, p) => acc + (p.costo * p.cantidad), 0);
+      const promMay = productos.length ? productos.reduce((acc, p) => acc + (p.costo * (1 + p.margenMay / 100)), 0) / productos.length : 0;
+      const promMin = productos.length ? productos.reduce((acc, p) => acc + (p.costo * (1 + p.margenMin / 100)), 0) / productos.length : 0;
+
+      document.getElementById('metric-total-prod').textContent = totalProd;
+      document.getElementById('metric-valor-inv').textContent = '$' + valorInv.toLocaleString('es-AR', {minimumFractionDigits: 0});
+      document.getElementById('metric-prom-may').textContent = '$' + promMay.toLocaleString('es-AR', {minimumFractionDigits: 0});
+      document.getElementById('metric-prom-min').textContent = '$' + promMin.toLocaleString('es-AR', {minimumFractionDigits: 0});
+      document.getElementById('next-id-badge').textContent = 'Próximo ID: ART-' + (101 + productos.length);
+    }
+
+    // EXPORTACIÓN EXCEL
+    function exportarStockComprasCSV() {
+      if (productos.length === 0) return alert("No hay productos cargados.");
+      let csv = "\uFEFFsep=,\nCódigo,Producto,Categoría,Sexo,Talle,Color,CantidadStock,CostoUnitario,CostoTotalCompra\n";
+      productos.forEach(p => {
+        const total = (p.costo * p.cantidad).toFixed(2);
+        csv += `"${p.id}","${p.nombre.replace(/"/g, '""')}","${p.categoria}","${p.sexo}","${p.talle}","${p.color.replace(/"/g, '""')}",${p.cantidad},${p.costo.toFixed(2)},${total}\n`;
+      });
+      descargarCSV(csv, `stock_compras_${new Date().toISOString().slice(0, 10)}.csv`);
+    }
+
+    function exportarCompletoCSV() {
+      if (productos.length === 0) return alert("No hay productos cargados.");
+      let csv = "\uFEFFsep=,\nCódigo,Producto,Categoría,Sexo,Talle,Color,Cantidad,CostoUnitario,MargenMayorista,PrecioMayorista,MargenMinorista,PrecioMinorista\n";
+      productos.forEach(p => {
+        const pMay = (p.costo * (1 + p.margenMay / 100)).toFixed(2);
+        const pMin = (p.costo * (1 + p.margenMin / 100)).toFixed(2);
+        csv += `"${p.id}","${p.nombre.replace(/"/g, '""')}","${p.categoria}","${p.sexo}","${p.talle}","${p.color.replace(/"/g, '""')}",${p.cantidad},${p.costo.toFixed(2)},"${p.margenMay}%",${pMay},"${p.margenMin}%",${pMin}\n`;
+      });
+      descargarCSV(csv, `reporte_completo_indumentaria_${new Date().toISOString().slice(0, 10)}.csv`);
+    }
+
+    function descargarCSV(contenido, nombreArchivo) {
+      const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", nombreArchivo);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    function imprimirStockCompras() {
+      const tbody = document.getElementById('print-compras-tbody');
+      tbody.innerHTML = '';
+      productos.forEach(p => {
+        const total = p.costo * p.cantidad;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="p-2 border font-bold">${p.id}</td>
+          <td class="p-2 border">${p.nombre}</td>
+          <td class="p-2 border">${p.categoria}</td>
+          <td class="p-2 border">${p.talle} / ${p.color}</td>
+          <td class="p-2 border text-center font-bold">${p.cantidad}</td>
+          <td class="p-2 border text-right">$${p.costo.toFixed(2)}</td>
+          <td class="p-2 border text-right font-bold">$${total.toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('fecha-impresion-compras').textContent = 'Fecha: ' + new Date().toLocaleDateString('es-AR');
+
+      document.body.classList.remove('printing-factura');
+      document.body.classList.add('printing-compras');
+
+      setTimeout(() => {
+        window.print();
+        document.body.classList.remove('printing-compras');
+      }, 150);
+    }
+
+    // FACTURACIÓN LÓGICA
+    function prepararModuloFacturacion() {
+      const select = document.getElementById('vta-select-producto');
+      select.innerHTML = '';
+      productos.forEach(p => {
+        if (p.cantidad > 0) {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = `${p.id} - ${p.nombre} (${p.talle}/${p.color}) - Stock: ${p.cantidad}`;
+          select.appendChild(opt);
+        }
+      });
+      actualizarPrecioVentaUnitario();
+    }
+
+    function buscarAutocompleteCliente() {
+      const nombreInput = document.getElementById('vta-cliente-nombre').value.trim();
+      if (clientesCC[nombreInput]) {
+        document.getElementById('vta-cliente-tel').value = clientesCC[nombreInput].tel || '';
+        document.getElementById('vta-cliente-cuit').value = clientesCC[nombreInput].cuit || '';
+      }
+    }
+
+    function actualizarPrecioVentaUnitario() {
+      const id = document.getElementById('vta-select-producto').value;
+      const tipo = document.getElementById('vta-tipo-precio').value;
+      const p = productos.find(x => x.id === id);
+      if (!p) return;
+      const precio = tipo === 'minorista' ? p.costo * (1 + p.margenMin / 100) : p.costo * (1 + p.margenMay / 100);
+      document.getElementById('vta-precio-unitario').textContent = '$' + precio.toLocaleString('es-AR', {minimumFractionDigits: 2});
+    }
+
+    function agregarAlCarrito() {
+      const id = document.getElementById('vta-select-producto').value;
+      const tipo = document.getElementById('vta-tipo-precio').value;
+      const cantidad = parseInt(document.getElementById('vta-cantidad').value) || 1;
+      const p = productos.find(x => x.id === id);
+
+      if (!p || cantidad > p.cantidad) {
+        return alert("Stock insuficiente para agregar al pedido.");
+      }
+
+      const precioUnitario = tipo === 'minorista' ? p.costo * (1 + p.margenMin / 100) : p.costo * (1 + p.margenMay / 100);
+      carritoVenta.push({
+        productoId: p.id,
+        nombre: p.nombre,
+        talle: p.talle,
+        color: p.color,
+        costoUnitario: p.costo,
+        precioUnitario: precioUnitario,
+        cantidad: cantidad,
+        subtotal: precioUnitario * cantidad
+      });
+
+      renderizarCarrito();
+    }
+
+    function renderizarCarrito() {
+      const tbody = document.getElementById('carrito-body');
+      tbody.innerHTML = '';
+      let totalMonto = 0;
+      let totalItems = 0;
+
+      carritoVenta.forEach((item, index) => {
+        totalMonto += item.subtotal;
+        totalItems += item.cantidad;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="p-3 font-medium">${item.nombre} <span class="text-[10px] text-slate-400">(${item.talle})</span></td>
+          <td class="p-3 text-center font-bold">${item.cantidad}</td>
+          <td class="p-3 text-right">$${item.precioUnitario.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+          <td class="p-3 text-right font-bold text-slate-900">$${item.subtotal.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+          <td class="p-3 text-center">
+            <button onclick="quitarDelCarrito(${index})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-xmark"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('vta-total-items').textContent = totalItems;
+      document.getElementById('vta-total-monto').textContent = '$' + totalMonto.toLocaleString('es-AR', {minimumFractionDigits: 2});
+    }
+
+    function quitarDelCarrito(index) {
+      carritoVenta.splice(index, 1);
+      renderizarCarrito();
+    }
+
+    function procesarVenta(imprimirA4 = false) {
+      if (carritoVenta.length === 0) return alert("El carrito está vacío.");
+      const nombreCliente = document.getElementById('vta-cliente-nombre').value.trim();
+      if (!nombreCliente) return alert("Ingrese el nombre del cliente.");
+
+      const condicion = document.querySelector('input[name="condicion-pago"]:checked').value;
+      const totalVenta = carritoVenta.reduce((acc, i) => acc + i.subtotal, 0);
+      const totalCosto = carritoVenta.reduce((acc, i) => acc + (i.costoUnitario * i.cantidad), 0);
+
+      // RESTAR STOCK DE FORMA AUTOMÁTICA
+      carritoVenta.forEach(item => {
+        const prod = productos.find(p => p.id === item.productoId);
+        if (prod) prod.cantidad -= item.cantidad;
+      });
+
+      const ventaObj = {
+        nroVenta: 'VTA-' + (1001 + ventas.length),
+        fecha: new Date().toLocaleDateString('es-AR'),
+        cliente: nombreCliente,
+        tel: document.getElementById('vta-cliente-tel').value || 'N/D',
+        cuit: document.getElementById('vta-cliente-cuit').value || 'N/D',
+        condicion: condicion,
+        items: [...carritoVenta],
+        totalVenta: totalVenta,
+        totalCosto: totalCosto,
+        ganancia: totalVenta - totalCosto
+      };
+
+      ventas.push(ventaObj);
+      ultimaVentaProcesada = ventaObj;
+
+      // IMPACTAR EN CUENTA CORRIENTE
+      if (condicion === 'cc') {
+        if (!clientesCC[nombreCliente]) {
+          clientesCC[nombreCliente] = {
+            nombre: nombreCliente,
+            tel: ventaObj.tel,
+            cuit: ventaObj.cuit,
+            saldo: 0,
+            movimientos: []
+          };
+        }
+        clientesCC[nombreCliente].saldo += totalVenta;
+        clientesCC[nombreCliente].movimientos.push({
+          fecha: ventaObj.fecha,
+          concepto: `Venta ${ventaObj.nroVenta}`,
+          debe: totalVenta,
+          haber: 0,
+          saldo: clientesCC[nombreCliente].saldo
+        });
+      }
+
+      guardarEstadoGlobal();
+      actualizarVistaPreviaPantalla(ventaObj);
+
+      if (imprimirA4) {
+        imprimirComprobanteFacturaA4(ventaObj);
+      } else {
+        alert("Venta registrada con éxito.");
+      }
+
+      carritoVenta = [];
+      renderizarCarrito();
+      renderizarTabla();
+      actualizarMetricas();
+      document.getElementById('vta-cliente-nombre').value = '';
+      document.getElementById('vta-cliente-tel').value = '';
+      document.getElementById('vta-cliente-cuit').value = '';
+    }
+
+    function actualizarVistaPreviaPantalla(vta) {
+      document.getElementById('vista-previa-factura-container').classList.remove('hidden');
+      document.getElementById('pv-nro').textContent = 'N° ' + vta.nroVenta;
+      document.getElementById('pv-fecha').textContent = vta.fecha;
+      document.getElementById('pv-cliente').textContent = vta.cliente;
+      document.getElementById('pv-tel').textContent = vta.tel;
+      document.getElementById('pv-cuit').textContent = vta.cuit;
+
+      const tbody = document.getElementById('pv-body');
+      tbody.innerHTML = '';
+      vta.items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="p-2 font-bold">${item.nombre}</td>
+          <td class="p-2">${item.talle}</td>
+          <td class="p-2">${item.color}</td>
+          <td class="p-2 text-center font-bold">${item.cantidad}</td>
+          <td class="p-2 text-right">$${item.precioUnitario.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+          <td class="p-2 text-right font-bold">$${item.subtotal.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('pv-total').textContent = '$' + vta.totalVenta.toLocaleString('es-AR', {minimumFractionDigits: 2});
+    }
+
+    function imprimirVistaPreviaA4() {
+      if (ultimaVentaProcesada) {
+        imprimirComprobanteFacturaA4(ultimaVentaProcesada);
+      } else {
+        window.print();
+      }
+    }
+
+    function imprimirComprobanteFacturaA4(vta) {
+      document.getElementById('print-factura-nro').textContent = 'N° ' + vta.nroVenta;
+      document.getElementById('print-factura-fecha').textContent = vta.fecha;
+      document.getElementById('print-factura-condicion').textContent = vta.condicion === 'contado' ? 'Contado' : 'Cuenta Corriente';
+      document.getElementById('print-factura-cliente').textContent = vta.cliente;
+      document.getElementById('print-factura-tel').textContent = vta.tel;
+      document.getElementById('print-factura-cuit').textContent = vta.cuit;
+
+      const tbody = document.getElementById('print-factura-body');
+      tbody.innerHTML = '';
+      vta.items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="p-2 font-bold">${item.nombre}</td>
+          <td class="p-2">${item.talle}</td>
+          <td class="p-2">${item.color}</td>
+          <td class="p-2 text-center font-bold">${item.cantidad}</td>
+          <td class="p-2 text-right">$${item.precioUnitario.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+          <td class="p-2 text-right font-bold">$${item.subtotal.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('print-factura-total').textContent = '$' + vta.totalVenta.toLocaleString('es-AR', {minimumFractionDigits: 2});
+
+      document.body.classList.remove('printing-compras');
+      document.body.classList.add('printing-factura');
+
+      setTimeout(() => {
+        window.print();
+        document.body.classList.remove('printing-factura');
+      }, 150);
+    }
+
+    // CUENTAS CORRIENTES LÓGICA
+    function renderizarListaClientesCC() {
+      const query = document.getElementById('search-cc-cliente').value.toLowerCase();
+      const cont = document.getElementById('lista-clientes-cc');
+      cont.innerHTML = '';
+
+      Object.keys(clientesCC).forEach(nombre => {
+        if (nombre.toLowerCase().includes(query)) {
+          const c = clientesCC[nombre];
+          const div = document.createElement('div');
+          div.className = 'p-3 hover:bg-slate-50 cursor-pointer flex justify-between items-center transition-colors';
+          div.onclick = () => seleccionarClienteCC(nombre);
+          div.innerHTML = `
+            <div>
+              <div class="font-bold text-slate-800 text-xs">${c.nombre}</div>
+              <div class="text-[10px] text-slate-400">${c.tel || 'Sin tel.'}</div>
+            </div>
+            <span class="font-bold text-xs ${c.saldo > 0 ? 'text-rose-600' : 'text-emerald-600'}">$${c.saldo.toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>
+          `;
+          cont.appendChild(div);
+        }
+      });
+    }
+
+    function seleccionarClienteCC(nombre) {
+      clienteCCSeleccionado = nombre;
+      const c = clientesCC[nombre];
+      document.getElementById('cc-nombre-cliente').textContent = c.nombre;
+      document.getElementById('cc-datos-cliente').textContent = `Tel: ${c.tel || 'N/D'} | CUIT/DNI: ${c.cuit || 'N/D'}`;
+      document.getElementById('cc-saldo-cliente').textContent = '$' + c.saldo.toLocaleString('es-AR', {minimumFractionDigits: 2});
+
+      const tbody = document.getElementById('cc-tabla-body');
+      tbody.innerHTML = '';
+      c.movimientos.forEach(m => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="p-3 text-slate-500">${m.fecha}</td>
+          <td class="p-3 font-medium text-slate-800">${m.concepto}</td>
+          <td class="p-3 text-right font-semibold text-rose-600">${m.debe > 0 ? '$' + m.debe.toLocaleString('es-AR', {minimumFractionDigits: 2}) : '-'}</td>
+          <td class="p-3 text-right font-semibold text-emerald-600">${m.haber > 0 ? '$' + m.haber.toLocaleString('es-AR', {minimumFractionDigits: 2}) : '-'}</td>
+          <td class="p-3 text-right font-bold text-slate-900">$${m.saldo.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function registrarPagoCC() {
+      if (!clienteCCSeleccionado) return alert("Seleccione un cliente primero.");
+      const monto = parseFloat(document.getElementById('cc-monto-pago').value) || 0;
+      const concepto = document.getElementById('cc-concepto-pago').value.trim() || 'Pago / Entrega a cuenta';
+      if (monto <= 0) return alert("Ingrese un monto válido.");
+
+      const c = clientesCC[clienteCCSeleccionado];
+      c.saldo -= monto;
+      c.movimientos.push({
+        fecha: new Date().toLocaleDateString('es-AR'),
+        concepto: concepto,
+        debe: 0,
+        haber: monto,
+        saldo: c.saldo
+      });
+
+      guardarEstadoGlobal();
+      seleccionarClienteCC(clienteCCSeleccionado);
+      renderizarListaClientesCC();
+      document.getElementById('cc-monto-pago').value = '';
+      document.getElementById('cc-concepto-pago').value = '';
+    }
+
+    // GANANCIAS SEMANALES LÓGICA
+    function renderizarResumenSemanales() {
+      const totalVentas = ventas.reduce((acc, v) => acc + v.totalVenta, 0);
+      const totalCosto = ventas.reduce((acc, v) => acc + v.totalCosto, 0);
+      const totalGanancia = totalVentas - totalCosto;
+
+      document.getElementById('resumen-total-ventas').textContent = '$' + totalVentas.toLocaleString('es-AR', {minimumFractionDigits: 2});
+      document.getElementById('resumen-total-costo').textContent = '$' + totalCosto.toLocaleString('es-AR', {minimumFractionDigits: 2});
+      document.getElementById('resumen-total-ganancia').textContent = '$' + totalGanancia.toLocaleString('es-AR', {minimumFractionDigits: 2});
+
+      const tbody = document.getElementById('resumen-tabla-body');
+      tbody.innerHTML = '';
+      ventas.forEach((v, index) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="p-3 pl-5 font-semibold text-slate-500">${v.nroVenta} <div class="text-[10px] text-slate-400 font-normal">${v.fecha}</div></td>
+          <td class="p-3 font-bold text-slate-800">${v.cliente}</td>
+          <td class="p-3"><span class="px-2 py-0.5 text-[10px] rounded font-semibold uppercase ${v.condicion === 'contado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${v.condicion}</span></td>
+          <td class="p-3 text-right font-semibold">$${v.totalVenta.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+          <td class="p-3 text-right text-slate-500">$${v.totalCosto.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+          <td class="p-3 text-right font-bold text-emerald-600">$${v.ganancia.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+          <td class="p-3 text-center">
+            <button onclick='imprimirComprobanteFacturaA4(ventas[${index}])' class="text-sky-600 hover:text-sky-800 font-semibold p-1" title="Reimprimir Factura A4"><i class="fa-solid fa-print"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.onload = function() {
+      calcularPrecios();
+      renderizarTabla();
+      actualizarMetricas();
+    };
+  </script>
+</body>
+</html>
